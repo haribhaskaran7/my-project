@@ -23,11 +23,13 @@ a:hover {
 }
 
 
- body {
+body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-}
+  width: 100%;
+  background: #f6f8f7;
+} 
 
 h1 {
   font-size: 3.2em;
