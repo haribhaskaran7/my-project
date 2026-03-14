@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -6,58 +6,200 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis
 } from "recharts";
 
+function ParticleBackground() {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let animationId;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+
+    const particles = [];
+    const count = 80;
+
+    const rand = (min, max) => Math.random() * (max - min) + min;
+
+    const initParticles = () => {
+      particles.length = 0;
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: rand(0, window.innerWidth),
+          y: rand(0, window.innerHeight),
+          r: rand(0.6, 2.4),
+          vx: rand(-0.15, 0.15),
+          vy: rand(-0.1, 0.1),
+          alpha: rand(0.1, 0.55),
+        });
+      }
+    };
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "rgba(10, 19, 32, 0.2)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(31, 197, 123, ${p.alpha})`;
+        ctx.fill();
+      });
+
+      animationId = requestAnimationFrame(draw);
+    };
+
+    resize();
+    initParticles();
+    window.addEventListener("resize", resize);
+    draw();
+
+    return () => {
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
+
+  return <canvas ref={ref} style={{ position: "fixed", inset: 0, zIndex: -1 }} />;
+}
+
 /* ─── THEME ──────────────────────────────────────────────────────────────── */
 const T = {
-  bg:"#f4f8f5", surface:"#ffffff", card:"#ffffff",
-  green:"#16a34a", greenD:"#15803d", greenL:"#22c55e",
-  greenPale:"#f0fdf4", greenMid:"#bbf7d0",
-  amber:"#d97706", amberL:"#fef3c7",
-  red:"#dc2626", redL:"#fef2f2",
-  blue:"#1d6fb8", blueL:"#eff6ff",
-  purple:"#7c3aed",
-  text:"#0f1f14", sub:"#374151", muted:"#6b7280",
-  border:"#d1fae5", borderG:"#e5e7eb",
-  shadow:"0 1px 8px rgba(22,163,74,0.10)",
-  shadowMd:"0 4px 24px rgba(22,163,74,0.14)",
+  bg:"#0b1320", surface:"#0f172a", card:"#0f192e",
+  green:"#22c55e", greenD:"#16a34a", greenL:"#4ade80",
+  greenPale:"#0d1f2a", greenMid:"#1e3a4d",
+  amber:"#f59e0b", amberL:"#fef3c7",
+  red:"#f87171", redL:"#fef2f2",
+  blue:"#38bdf8", blueL:"#e0f2fe",
+  purple:"#a78bfa",
+  text:"#e2e8f0", sub:"#94a3b8", muted:"#64748b",
+  border:"#1e293b", borderG:"#334155",
+  shadow:"0 1px 12px rgba(0,0,0,0.35)",
+  shadowMd:"0 8px 34px rgba(0,0,0,0.40)",
 };
 
 /* ─── DB ─────────────────────────────────────────────────────────────────── */
 const DB = {
+  // User storage is now multi-account aware. We keep a list of users and the current active user email.
+  async getUsers() {
+    const r = localStorage.getItem("iq:users");
+    return r ? JSON.parse(r) : [];
+  },
+
+  async setUsers(users) {
+    localStorage.setItem("iq:users", JSON.stringify(users));
+  },
+
+  async getCurrentUserEmail() {
+    const email = localStorage.getItem("iq:currentUser");
+    if (email) return email;
+    // legacy fallback: legacy single-user storage
+    const legacy = localStorage.getItem("iq:user");
+    if (legacy) {
+      const u = JSON.parse(legacy);
+      if (u?.email) {
+        await this._migrateUser(u);
+        return u.email;
+      }
+    }
+    return null;
+  },
+
+  async setCurrentUserEmail(email) {
+    if (!email) {
+      localStorage.removeItem("iq:currentUser");
+      return;
+    }
+    localStorage.setItem("iq:currentUser", email);
+  },
+
+  async _migrateUser(u) {
+    const users = await this.getUsers();
+    const exists = users.find(x => x.email === u.email);
+    if (!exists) users.push(u);
+    await this.setUsers(users);
+    await this.setCurrentUserEmail(u.email);
+    localStorage.removeItem("iq:user");
+  },
 
   async getUser() {
-    const r = localStorage.getItem("iq:user");
-    return r ? JSON.parse(r) : null;
+    const email = await this.getCurrentUserEmail();
+    if (!email) return null;
+    const users = await this.getUsers();
+    return users.find(u => u.email === email) || null;
   },
 
   async setUser(u) {
-    localStorage.setItem("iq:user", JSON.stringify(u));
+    if (!u) {
+      await this.setCurrentUserEmail(null);
+      return;
+    }
+    const users = await this.getUsers();
+    const idx = users.findIndex(x => x.email === u.email);
+    if (idx >= 0) users[idx] = u;
+    else users.push(u);
+    await this.setUsers(users);
+    await this.setCurrentUserEmail(u.email);
   },
 
+  _historyKey(email) { return `iq:history:${email}`; },
+  _profileKey(email) { return `iq:profile:${email}`; },
+
   async getHistory() {
-    const r = localStorage.getItem("iq:history");
+    const user = await this.getUser();
+    if (!user) {
+      const r = localStorage.getItem("iq:history");
+      return r ? JSON.parse(r) : [];
+    }
+    const r = localStorage.getItem(this._historyKey(user.email));
     return r ? JSON.parse(r) : [];
   },
 
   async addHistory(h) {
+    const user = await this.getUser();
+    const key = user ? this._historyKey(user.email) : "iq:history";
     const arr = await this.getHistory();
     arr.unshift({ ...h, id: Date.now(), ts: new Date().toLocaleString("en-IN") });
-    localStorage.setItem("iq:history", JSON.stringify(arr));
+    localStorage.setItem(key, JSON.stringify(arr));
     return arr;
   },
 
   async clearHistory() {
-    localStorage.removeItem("iq:history");
+    const user = await this.getUser();
+    const key = user ? this._historyKey(user.email) : "iq:history";
+    localStorage.removeItem(key);
   },
 
   async getProfile() {
-    const r = localStorage.getItem("iq:profile");
+    const user = await this.getUser();
+    if (!user) {
+      const r = localStorage.getItem("iq:profile");
+      return r ? JSON.parse(r) : null;
+    }
+    const r = localStorage.getItem(this._profileKey(user.email));
     return r ? JSON.parse(r) : null;
   },
 
   async setProfile(p) {
-    localStorage.setItem("iq:profile", JSON.stringify(p));
+    const user = await this.getUser();
+    if (!user) {
+      localStorage.setItem("iq:profile", JSON.stringify(p));
+      return;
+    }
+    localStorage.setItem(this._profileKey(user.email), JSON.stringify(p));
   }
-
 };
 
 /* ─── UTILS ──────────────────────────────────────────────────────────────── */
@@ -226,7 +368,7 @@ const ASSETS = [
   { value:"gold",         label:"🥇 Gold / Sovereign Bond",    ret:8,   risk:38, tax:20, lock:0  },
   { value:"real_estate",  label:"🏠 Real Estate",              ret:9,   risk:45, tax:20, lock:5  },
   { value:"stocks",       label:"📉 Direct Stocks",            ret:15,  risk:80, tax:10, lock:0  },
-  { value:"crypto",       label:" ₿  Crypto",                   ret:20,  risk:95, tax:30, lock:0  },
+  { value:"crypto",       label:"₿ Crypto",                   ret:20,  risk:95, tax:30, lock:0  },
   { value:"debt_fund",    label:"🔒 Debt / Liquid Fund",       ret:7.5, risk:18, tax:30, lock:0  },
   { value:"rd",           label:"💳 Recurring Deposit",        ret:6.5, risk:8,  tax:30, lock:1  },
 ];
@@ -1044,9 +1186,28 @@ function AuthModal({ onAuth }) {
     if (!form.email || !form.password) return setErr("Email and password are required.");
     if (mode === "signup" && !form.name) return setErr("Please enter your name.");
     setErr("");
-    const user = { name: form.name || form.email.split("@")[0], email: form.email, joined: new Date().toLocaleDateString("en-IN") };
-    await DB.setUser(user);
-    onAuth(user);
+
+    const email = form.email.toLowerCase().trim();
+
+    if (mode === "login") {
+      const existingUser = (await DB.getUsers()).find(u => u.email === email);
+      if (!existingUser) {
+        return setErr("No account found with this email. Please sign up first.");
+      }
+      if (existingUser.password !== form.password) {
+        return setErr("Incorrect password. Please try again.");
+      }
+      await DB.setUser(existingUser);
+      onAuth(existingUser);
+    } else {
+      const existingUser = (await DB.getUsers()).find(u => u.email === email);
+      if (existingUser) {
+        return setErr("An account with this email already exists. Please login instead.");
+      }
+      const user = { name: form.name || form.email.split("@")[0], email, password: form.password, joined: new Date().toLocaleDateString("en-IN") };
+      await DB.setUser(user);
+      onAuth(user);
+    }
   };
 
   return (
@@ -1111,12 +1272,18 @@ const TABS = [
 /* ─── ROOT APP ───────────────────────────────────────────────────────────── */
 export default function App() {
   const [user,    setUser]    = useState(null);
+  const [users,   setUsers]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [active,  setActive]  = useState("analyser");
   const [page,    setPage]    = useState("calc");
   const [history, setHistory] = useState([]);
   const [profile, setProfile] = useState(null);
   const [toast,   setToast]   = useState("");
+
+  const refreshUsers = async () => {
+    const all = await DB.getUsers();
+    setUsers(all);
+  };
 
   useEffect(() => {
     (async () => {
@@ -1126,6 +1293,7 @@ export default function App() {
       if (u) setUser(u);
       setHistory(h);
       setProfile(pr);
+      await refreshUsers();
       setLoading(false);
     })();
   }, []);
@@ -1147,7 +1315,22 @@ export default function App() {
     showToast("✅ Profile updated!");
   };
 
+  const handleSwitchUser = async () => {
+    const email = window.prompt("Enter the email of the account to switch to:");
+    if (!email) return;
+    const norm = email.toLowerCase().trim();
+    const candidate = (await DB.getUsers()).find(u => u.email === norm);
+    if (!candidate) {
+      showToast("No user found with that email.");
+      return;
+    }
+    await DB.setUser(candidate);
+    setUser(candidate);
+    showToast(`Switched to ${candidate.name}`);
+  };
+
   const handleLogout = async () => {
+    // Clear the active session (but keep all stored accounts).
     await DB.setUser(null);
     setUser(null);
     setPage("calc");
@@ -1165,23 +1348,25 @@ export default function App() {
   const ActiveCalc = TABS.find(t => t.id === active)?.component;
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'DM Sans',sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0a121c 0%, #0f1c33 45%, #102548 100%)", color: T.text, fontFamily: "'DM Sans',sans-serif", position: "relative", overflow: "hidden" }}>
+      <ParticleBackground />
       {/* FIX: global styles hoisted to top-level, outside any conditional/animated div */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;800;900&family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
         * { box-sizing: border-box; }
         @keyframes iqFadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
-        input:focus  { border-color: ${T.green} !important; box-shadow: 0 0 0 3px ${T.green}18 !important; outline: none; }
+        input:focus  { border-color: ${T.green} !important; box-shadow: 0 0 0 3px ${T.green}3d !important; outline: none; }
         select:focus { border-color: ${T.green} !important; outline: none; }
         button:active { opacity: .87; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-thumb { background: ${T.greenMid}; border-radius: 2px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: ${T.greenMid}; border-radius: 3px; }
+        body { background: #0b1320; }
       `}</style>
 
-      {!user && <AuthModal onAuth={u => setUser(u)} />}
+      {!user && <AuthModal onAuth={u => { setUser(u); refreshUsers(); }} />}
 
       {/* TOP BAR */}
-      <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, padding: "0 20px", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50, boxShadow: "0 1px 6px rgba(22,163,74,0.07)" }}>
+      <div style={{ background: "linear-gradient(90deg, rgba(12,25,47,0.95), rgba(5,11,18,0.8))", borderBottom: `1px solid ${T.border}`, padding: "0 20px", height: 54, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50, boxShadow: "0 8px 22px rgba(0,0,0,0.45)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <div style={{ width: 30, height: 30, borderRadius: 8, background: T.green, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🏆</div>
           <span style={{ fontSize: 18, fontWeight: 900, fontFamily: "'Outfit',sans-serif" }}>Invest<span style={{ color: T.green }}>Quest</span></span>
@@ -1196,6 +1381,7 @@ export default function App() {
               </div>
               {profile?.name || user.name}
             </button>
+            <button onClick={handleSwitchUser} style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${T.borderG}`, background: "transparent", color: T.muted, fontSize: 11, cursor: "pointer" }}>Switch</button>
             <button onClick={handleLogout} style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${T.borderG}`, background: "transparent", color: T.muted, fontSize: 11, cursor: "pointer" }}>Logout</button>
           </div>
         )}
@@ -1203,7 +1389,7 @@ export default function App() {
 
       {/* TOAST */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: T.green, color: "#fff", padding: "10px 22px", borderRadius: 30, fontSize: 13, fontWeight: 700, zIndex: 999, boxShadow: T.shadowMd }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "rgba(29, 201, 121, 0.95)", color: "#0a1120", padding: "10px 22px", borderRadius: 30, fontSize: 13, fontWeight: 700, zIndex: 999, boxShadow: T.shadowMd }}>
           {toast}
         </div>
       )}
