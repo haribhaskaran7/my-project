@@ -1,14 +1,106 @@
-Live demo🌍:https://my-project-vzmd.vercel.app
-# Investment Tracker 💰
+# InvestQuest 💰
 
-A full-stack web application to manage and track personal investments.  
-This application allows users to add, view, update, and delete investment records using a simple web interface.
+A modern, full-stack investment calculator and tracker with multi-user support, dark theme, and real-time calculations.
 
 ---
 
 ## 🚀 Features
 
-- Add new investments
+- **Investment Analyser**: Calculate returns for various assets (stocks, mutual funds, FD, etc.)
+- **SIP Growth Calculator**: Plan systematic investment plans
+- **Goal Planner**: Set financial goals and see required investments
+- **Inflation Impact**: See how inflation affects your savings
+- **Risk Profile Assessment**: Evaluate your risk tolerance
+- **Compound Interest Calculator**: With EMI calculations
+- **Multi-User Accounts**: Save multiple user profiles with persistent data
+- **Dark Theme**: Modern UI with animated particle background
+- **Responsive Design**: Works on desktop and mobile
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React + Vite, Recharts for visualizations
+- **Backend**: Node.js + Express
+- **Styling**: Custom CSS with dark theme
+- **Storage**: localStorage for user data persistence
+
+---
+
+## 📦 Installation & Setup
+
+### Prerequisites
+- Node.js (v16+)
+- npm or yarn
+
+### Clone the Repository
+```bash
+git clone https://github.com/haribhaskaran7/my-project.git
+cd my-project
+```
+
+### Backend Setup
+```bash
+cd backend
+npm install
+npm start
+```
+Backend will run on `http://localhost:5000`
+
+### Frontend Setup
+```bash
+cd my-app
+npm install
+npm run dev
+```
+Frontend will run on `http://localhost:5184` (or similar port)
+
+---
+
+## 🎯 Usage
+
+1. Open the frontend URL in your browser
+2. Sign up with an email and password
+3. Use the calculators to analyze investments
+4. Your data is saved locally and persists across sessions
+5. Switch between multiple accounts if needed
+
+**Important**: Always use the same frontend URL to maintain data persistence. Bookmark the URL after first run.
+
+---
+
+## 🔧 API Endpoints
+
+- `GET /` - Health check
+- `POST /calculate` - Calculate future value (amount, rate, years)
+
+---
+
+## 📱 Screenshots
+
+*(Add screenshots here)*
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit changes
+4. Push to branch
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+MIT License
+
+---
+
+## 👨‍💻 Author
+
+Haribhaskaran
 - View all investments
 - Update investment details
 - Delete investments
