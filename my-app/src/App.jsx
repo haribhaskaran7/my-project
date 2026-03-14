@@ -1188,13 +1188,19 @@ function AuthModal({ onAuth }) {
     setErr("");
 
     const email = form.email.toLowerCase().trim();
+    const password = form.password.trim();
 
     if (mode === "login") {
       const existingUser = (await DB.getUsers()).find(u => u.email === email);
       if (!existingUser) {
         return setErr("No account found with this email. Please sign up first.");
       }
-      if (existingUser.password !== form.password) {
+      // Migrate legacy users who previously didn't store passwords
+      if (!existingUser.password) {
+        existingUser.password = password;
+        await DB.setUser(existingUser);
+      }
+      if (existingUser.password !== password) {
         return setErr("Incorrect password. Please try again.");
       }
       await DB.setUser(existingUser);
@@ -1204,7 +1210,7 @@ function AuthModal({ onAuth }) {
       if (existingUser) {
         return setErr("An account with this email already exists. Please login instead.");
       }
-      const user = { name: form.name || form.email.split("@")[0], email, password: form.password, joined: new Date().toLocaleDateString("en-IN") };
+      const user = { name: form.name || form.email.split("@")[0], email, password, joined: new Date().toLocaleDateString("en-IN") };
       await DB.setUser(user);
       onAuth(user);
     }
@@ -1297,6 +1303,22 @@ export default function App() {
       setLoading(false);
     })();
   }, []);
+
+  // Reload stored data whenever the active user changes.
+  useEffect(() => {
+    if (!user) {
+      setHistory([]);
+      setProfile(null);
+      return;
+    }
+
+    (async () => {
+      const h  = await DB.getHistory();
+      const pr = await DB.getProfile();
+      setHistory(h);
+      setProfile(pr);
+    })();
+  }, [user]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
