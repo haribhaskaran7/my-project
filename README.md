@@ -1,3 +1,8 @@
+Demo video:🎥 Project Demo Video
+Watch the working demo of the FinCal Financial Calculator here:
+
+https://youtu.be/r9LNzLDbBJM?si=nodtXjeq3H8gaLcg
+
 # InvestQuest 💰
 
 A modern, full-stack investment calculator and tracker with multi-user support, dark theme, and real-time calculations.
